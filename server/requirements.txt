@@ -1,0 +1,21 @@
+# Pic2Mesh 前端（index.html）无需任何依赖；
+# 下列依赖仅用于可选的本地 TripoSR 推理服务 server/triposr_server.py
+
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+Pillow>=10.0
+numpy>=1.24
+
+# TripoSR 本体依赖（另需 pip install -e /path/to/TripoSR 安装 tsr 包）
+torch>=2.0.0
+torchvision
+trimesh>=4.0
+omegaconf
+einops
+transformers
+xatlas
+# pip install git+https://github.com/tatsy/torchmcubes.git
+
+# 若使用 GPU，请按 https://pytorch.org 的官方命令安装对应 CUDA 版本的 torch：
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121

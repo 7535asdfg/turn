@@ -1,0 +1,1386 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Pic2Mesh · 单图 3D 重建</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='M12 2.6 20.5 7v10L12 21.4 3.5 17V7z' stroke='%236ee7ff'/%3E%3Cpath d='M3.5 7 12 11.6 20.5 7M12 11.6v9.8' stroke='%238b7cff'/%3E%3C/svg%3E" />
+
+<style>
+  :root{
+    --bg:#06080d;
+    --panel:rgba(17,20,29,.78);
+    --card:rgba(255,255,255,.035);
+    --stroke:rgba(255,255,255,.085);
+    --stroke-strong:rgba(255,255,255,.16);
+    --text:#e9edf6;
+    --muted:#8b93a7;
+    --accent:#6ee7ff;
+    --accent2:#8b7cff;
+    --ok:#4ade80;
+    --err:#ff6b6b;
+    --radius:14px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,"Helvetica Neue",sans-serif;
+    font-size:13.5px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;border:0;background:none;}
+  code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:11.5px;padding:1px 5px;border-radius:5px;
+    background:rgba(255,255,255,.07);color:#c8d2e6;
+  }
+
+  #app{display:flex;height:100vh;height:100dvh;}
+
+  /* ---------------- 左侧面板 ---------------- */
+  #panel{
+    width:352px;flex:0 0 352px;
+    height:100%;
+    display:flex;flex-direction:column;gap:12px;
+    padding:18px 16px 14px;
+    overflow-y:auto;overflow-x:hidden;
+    background:var(--panel);
+    border-right:1px solid var(--stroke);
+    backdrop-filter:blur(22px) saturate(1.3);
+    -webkit-backdrop-filter:blur(22px) saturate(1.3);
+    scrollbar-width:thin;
+    scrollbar-color:rgba(255,255,255,.14) transparent;
+    z-index:5;
+  }
+  #panel::-webkit-scrollbar{width:7px;}
+  #panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.13);border-radius:99px;}
+  #panel::-webkit-scrollbar-track{background:transparent;}
+
+  .brand{display:flex;align-items:center;gap:11px;padding:2px 2px 4px;}
+  .logo{
+    width:38px;height:38px;flex:0 0 38px;border-radius:11px;
+    display:grid;place-items:center;
+    background:linear-gradient(140deg,rgba(110,231,255,.22),rgba(139,124,255,.24));
+    border:1px solid rgba(140,200,255,.28);
+    box-shadow:0 6px 22px -8px rgba(110,231,255,.55), inset 0 1px 0 rgba(255,255,255,.14);
+  }
+  .logo svg{width:20px;height:20px;}
+  .brand h1{margin:0;font-size:15px;font-weight:650;letter-spacing:.3px;}
+  .brand p{margin:1px 0 0;font-size:11.5px;color:var(--muted);}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--stroke);
+    border-radius:var(--radius);
+    padding:13px;
+  }
+  .card-title{
+    font-size:11px;font-weight:600;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--muted);
+    margin-bottom:10px;
+  }
+  .card-title.small{margin-bottom:6px;font-size:10.5px;}
+
+  /* 上传区 */
+  .dropzone{
+    position:relative;
+    display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:24px 12px;
+    border:1.5px dashed var(--stroke-strong);
+    border-radius:12px;
+    background:rgba(255,255,255,.022);
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .18s, background .18s, transform .18s;
+  }
+  .dropzone:hover,.dropzone.drag{
+    border-color:rgba(110,231,255,.62);
+    background:rgba(110,231,255,.06);
+  }
+  .dropzone.drag{transform:scale(.995);}
+  .dz-icon{
+    width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(150deg,rgba(110,231,255,.18),rgba(139,124,255,.18));
+    margin-bottom:3px;
+  }
+  .dz-icon svg{width:19px;height:19px;stroke:var(--accent);}
+  .dz-title{font-size:13.5px;font-weight:550;}
+  .dz-sub{font-size:11.5px;color:var(--muted);}
+
+  .file-meta{
+    display:flex;align-items:center;gap:11px;
+    padding:9px;border-radius:11px;
+    background:rgba(255,255,255,.045);
+    border:1px solid var(--stroke);
+  }
+  .file-meta img{
+    width:46px;height:46px;border-radius:8px;object-fit:cover;
+    background:#000;flex:0 0 46px;
+  }
+  .fm-info{min-width:0;flex:1;}
+  .fm-name{font-size:12.5px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .fm-sub{font-size:11px;color:var(--muted);}
+  .icon-btn{
+    width:26px;height:26px;border-radius:8px;color:var(--muted);
+    display:grid;place-items:center;font-size:17px;line-height:1;
+    transition:background .15s,color .15s;
+  }
+  .icon-btn:hover{background:rgba(255,107,107,.15);color:#ff9a9a;}
+
+  .hint{margin:8px 0 0;font-size:11px;color:var(--muted);line-height:1.5;}
+
+  /* 滑块 */
+  .slider-row{margin-top:12px;}
+  .slider-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+  .slider-head span{font-size:12px;color:#c2cadb;}
+  .slider-head b{font-size:11.5px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums;}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:16px;background:transparent;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:4px;border-radius:99px;
+    background:linear-gradient(90deg,rgba(110,231,255,.7),rgba(139,124,255,.5)) no-repeat,
+               rgba(255,255,255,.11);
+    background-size:var(--fill,30%) 100%, 100% 100%;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+    background:#eaf6ff;border:2px solid #0d1420;margin-top:-4.5px;
+    box-shadow:0 0 0 1px rgba(110,231,255,.55),0 2px 8px rgba(0,0,0,.6);
+    transition:transform .12s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15);}
+  input[type=range]::-moz-range-track{height:4px;border-radius:99px;background:rgba(255,255,255,.11);}
+  input[type=range]::-moz-range-progress{height:4px;border-radius:99px;background:linear-gradient(90deg,rgba(110,231,255,.7),rgba(139,124,255,.5));}
+  input[type=range]::-moz-range-thumb{
+    width:11px;height:11px;border-radius:50%;background:#eaf6ff;border:2px solid #0d1420;
+    box-shadow:0 0 0 1px rgba(110,231,255,.55);
+  }
+
+  .checkline{
+    display:flex;align-items:center;gap:7px;
+    font-size:12px;color:#c2cadb;cursor:pointer;
+    padding:3px 0;user-select:none;
+  }
+  .checkline input[type=checkbox]{
+    -webkit-appearance:none;appearance:none;
+    width:15px;height:15px;flex:0 0 15px;border-radius:5px;
+    border:1.5px solid var(--stroke-strong);background:rgba(0,0,0,.3);
+    position:relative;cursor:pointer;transition:all .15s;
+  }
+  .checkline input[type=checkbox]:checked{
+    background:linear-gradient(135deg,var(--accent),#9db4ff);
+    border-color:transparent;
+  }
+  .checkline input[type=checkbox]:checked::after{
+    content:"";position:absolute;left:4.4px;top:1.2px;
+    width:4px;height:8px;border:solid #07121a;border-width:0 2px 2px 0;
+    transform:rotate(42deg);
+  }
+  .toggle-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;}
+
+  /* 按钮 */
+  .btn{
+    width:100%;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:600;
+    transition:transform .12s,box-shadow .18s,opacity .18s,background .18s;
+    display:flex;align-items:center;justify-content:center;gap:7px;
+  }
+  .btn:active{transform:translateY(1px) scale(.995);}
+  .btn.primary{
+    background:linear-gradient(135deg,var(--accent) 0%,#9db4ff 55%,var(--accent2) 100%);
+    color:#06121a;
+    box-shadow:0 10px 26px -12px rgba(110,231,255,.9);
+  }
+  .btn.primary:hover:not(:disabled){box-shadow:0 14px 32px -12px rgba(110,231,255,1);}
+  .btn.ghost{
+    background:rgba(255,255,255,.055);border:1px solid var(--stroke);
+    color:#d3daea;font-weight:550;
+  }
+  .btn.ghost:hover:not(:disabled){background:rgba(255,255,255,.1);border-color:var(--stroke-strong);}
+  .btn:disabled{opacity:.36;cursor:not-allowed;box-shadow:none;}
+  .btn-row{display:flex;gap:8px;margin-top:8px;}
+
+  /* 状态 */
+  .status-card{padding:12px 13px;}
+  .status-head{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--muted);margin-bottom:8px;}
+  #statusText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #statusPct{font-variant-numeric:tabular-nums;color:var(--accent);flex:0 0 auto;}
+  .progress{height:3px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;}
+  .progress-bar{
+    height:100%;width:0%;border-radius:99px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    transition:width .3s cubic-bezier(.4,0,.2,1);
+  }
+  .progress-bar.indeterminate{
+    width:38%!important;
+    animation:slide 1.15s ease-in-out infinite;
+  }
+  @keyframes slide{
+    0%{transform:translateX(-105%);}
+    100%{transform:translateX(305%);}
+  }
+  .progress-bar.done{background:linear-gradient(90deg,#4ade80,#6ee7ff);}
+  .progress-bar.error{background:linear-gradient(90deg,#ff6b6b,#ff9f6b);}
+
+  .depth-preview{margin-top:12px;}
+  #depthCanvas{
+    width:100%;height:104px;display:block;border-radius:9px;
+    background:#000;border:1px solid var(--stroke);
+    image-rendering:auto;
+    object-fit:cover;
+  }
+
+  .foot{font-size:10.5px;line-height:1.65;color:#5f6779;padding:2px 3px 6px;margin-top:auto;}
+
+  /* ---------------- 主视区 ---------------- */
+  #stage{
+    position:relative;flex:1;min-width:0;
+    background:
+      radial-gradient(1100px 720px at 50% 32%,rgba(70,120,210,.20),transparent 68%),
+      radial-gradient(760px 560px at 84% 82%,rgba(139,124,255,.16),transparent 70%),
+      radial-gradient(600px 420px at 12% 88%,rgba(20,180,200,.10),transparent 72%),
+      #06080d;
+    overflow:hidden;
+  }
+  #view{display:block;width:100%;height:100%;}
+
+  #hud{
+    position:absolute;top:16px;right:16px;
+    display:flex;gap:2px;padding:4px;
+    border-radius:10px;
+    background:rgba(12,15,22,.62);border:1px solid var(--stroke);
+    backdrop-filter:blur(12px);
+    font-size:10.5px;color:var(--muted);
+    opacity:0;transition:opacity .35s;
+  }
+  #hud.show{opacity:1;}
+  .hud-item{display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 10px;}
+  .hud-item + .hud-item{border-left:1px solid rgba(255,255,255,.07);}
+  .hud-item b{font-size:12px;color:#dfe7f5;font-variant-numeric:tabular-nums;font-weight:600;}
+
+  #hint{
+    position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+    padding:6px 14px;border-radius:99px;
+    background:rgba(12,15,22,.6);border:1px solid var(--stroke);
+    backdrop-filter:blur(10px);
+    font-size:11px;color:#98a2b8;white-space:nowrap;
+    opacity:0;transition:opacity .35s;pointer-events:none;
+  }
+  #hint.show{opacity:1;}
+
+  .empty{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:9px;
+    text-align:center;pointer-events:none;
+    transition:opacity .4s,transform .4s;
+  }
+  .empty.hide{opacity:0;transform:scale(.97);}
+  .empty-ring{
+    width:94px;height:94px;border-radius:50%;margin-bottom:8px;
+    border:1px solid rgba(110,231,255,.22);
+    box-shadow:0 0 0 16px rgba(110,231,255,.045),0 0 0 34px rgba(139,124,255,.035),
+               inset 0 0 34px rgba(110,231,255,.10);
+    animation:pulse 3.6s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{transform:scale(1);opacity:.85;}
+    50%{transform:scale(1.05);opacity:1;}
+  }
+  .empty h2{margin:0;font-size:16px;font-weight:600;color:#cdd6e6;}
+  .empty p{margin:0;font-size:12px;color:var(--muted);max-width:300px;}
+
+  .toast{
+    position:absolute;left:50%;top:22px;transform:translate(-50%,-14px);
+    max-width:min(520px,86%);
+    padding:9px 16px;border-radius:10px;
+    background:rgba(16,20,28,.94);border:1px solid var(--stroke-strong);
+    box-shadow:0 18px 40px -18px rgba(0,0,0,.95);
+    font-size:12px;line-height:1.5;
+    opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;
+    backdrop-filter:blur(14px);
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  .toast.err{border-color:rgba(255,107,107,.5);color:#ffb3b3;}
+  .toast.ok{border-color:rgba(74,222,128,.45);color:#a7f3c9;}
+
+  .hidden{display:none!important;}
+
+  @media (max-width:880px){
+    #app{flex-direction:column-reverse;}
+    #panel{
+      width:100%;flex:0 0 auto;max-height:52vh;
+      border-right:0;border-top:1px solid var(--stroke);
+    }
+    #stage{flex:1;min-height:48vh;}
+    #hint{display:none;}
+  }
+</style>
+</head>
+
+<body>
+<div id="app">
+  <!-- ============ 控制面板 ============ -->
+  <aside id="panel">
+    <header class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#6ee7ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2.6 20.5 7v10L12 21.4 3.5 17V7z" stroke="#6ee7ff"/>
+          <path d="M3.5 7 12 11.6 20.5 7M12 11.6v9.8" stroke="#8b7cff"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Pic2Mesh</h1>
+        <p>单张照片 → 可旋转的 3D 效果图</p>
+      </div>
+    </header>
+
+    <!-- 上传 -->
+    <section class="card">
+      <div id="dropzone" class="dropzone">
+        <input type="file" id="fileInput" accept="image/*" hidden />
+        <div class="dz-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke="currentColor"/>
+            <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" stroke="currentColor"/>
+          </svg>
+        </div>
+        <div class="dz-title">选择文件</div>
+        <div class="dz-sub">点击选择本地照片 · 或拖拽 / Ctrl+V 粘贴</div>
+      </div>
+
+      <div id="fileMeta" class="file-meta hidden" style="margin-top:10px">
+        <img id="thumb" alt="" />
+        <div class="fm-info">
+          <div id="fmName" class="fm-name">—</div>
+          <div id="fmSize" class="fm-sub">—</div>
+        </div>
+        <button id="btnClear" class="icon-btn" title="移除图片">×</button>
+      </div>
+    </section>
+
+    <!-- 参数 -->
+    <section class="card">
+      <div class="card-title">重建参数</div>
+      <div class="slider-row">
+        <div class="slider-head"><span>深度强度</span><b id="valStrength">0.32</b></div>
+        <input type="range" id="rngStrength" min="0.05" max="1.2" step="0.01" value="0.32" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-head"><span>网格精度</span><b id="valRes">200</b></div>
+        <input type="range" id="rngRes" min="60" max="360" step="10" value="200" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-head"><span>平滑</span><b id="valSmooth">1</b></div>
+        <input type="range" id="rngSmooth" min="0" max="5" step="1" value="1" />
+      </div>
+      <label class="checkline" style="margin-top:9px"><input type="checkbox" id="chkInvert" /> 反转深度（近处凹陷）</label>
+      <label class="checkline"><input type="checkbox" id="chkMirror" checked /> 在线下载时优先用国内镜像</label>
+      <p class="hint" style="margin-top:6px">模型已随项目打包在 <code>models/</code>，默认完全离线运行。</p>
+    </section>
+
+    <!-- 显示 -->
+    <section class="card">
+      <div class="card-title">显示</div>
+      <div class="toggle-grid">
+        <label class="checkline"><input type="checkbox" id="chkRotate" checked /> 自动旋转</label>
+        <label class="checkline"><input type="checkbox" id="chkWire" /> 线框</label>
+        <label class="checkline"><input type="checkbox" id="chkPoints" /> 点云</label>
+        <label class="checkline"><input type="checkbox" id="chkUnlit" /> 原色（无光照）</label>
+      </div>
+    </section>
+
+    <!-- 操作 -->
+    <section class="card">
+      <button id="btnGenerate" class="btn primary" disabled>生成 3D 模型</button>
+      <div class="btn-row">
+        <button id="btnReset" class="btn ghost" disabled>重置视角</button>
+        <button id="btnExport" class="btn ghost" disabled>导出 GLB</button>
+      </div>
+    </section>
+
+    <!-- 状态 -->
+    <section class="card status-card">
+      <div class="status-head">
+        <span id="statusText">等待上传照片</span>
+        <span id="statusPct"></span>
+      </div>
+      <div class="progress"><div id="progressBar" class="progress-bar"></div></div>
+      <div id="depthPreviewWrap" class="depth-preview hidden">
+        <div class="card-title small" style="margin-top:4px">深度图</div>
+        <canvas id="depthCanvas"></canvas>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Depth Anything V2（ONNX）单目深度估计 → 网格 + 纹理重建，<br/>
+      全部在浏览器本地完成，照片不会上传。
+    </footer>
+  </aside>
+
+  <!-- ============ 3D 视区 ============ -->
+  <main id="stage">
+    <canvas id="view"></canvas>
+
+    <div id="hud">
+      <div class="hud-item"><span>顶点</span><b id="hudVerts">0</b></div>
+      <div class="hud-item"><span>三角面</span><b id="hudTris">0</b></div>
+      <div class="hud-item"><span>FPS</span><b id="hudFps">–</b></div>
+    </div>
+
+    <div id="hint">左键拖拽旋转 · 滚轮缩放 · 右键拖拽平移</div>
+
+    <div id="toast" class="toast"></div>
+
+    <div id="empty" class="empty">
+      <div class="empty-ring"></div>
+      <h2>上传一张照片开始重建</h2>
+      <p>算法会自动估计照片的深度信息，并生成可自由旋转、缩放、平移的 3D 效果图</p>
+    </div>
+  </main>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+const $ = (id) => document.getElementById(id);
+
+/* ============================================================
+   全局状态
+   ============================================================ */
+const state = {
+  file: null,
+  fileName: '',
+  image: null,           // HTMLImageElement
+  texCanvas: null,       // 纹理画布
+  texPixels: null,       // 纹理像素
+  tex: null,             // THREE.CanvasTexture
+  depthRaw: null,        // { data: Float32Array(0..1), w, h }
+  modelRoot: null,       // 当前展示的 Object3D
+  busy: false,
+  interacting: false,
+  needFrame: false,
+  params: {
+    strength: 0.32,
+    resolution: 200,
+    smooth: 1,
+    invert: false,
+    wireframe: false,
+    points: false,
+    unlit: false,
+  },
+};
+
+/* ============================================================
+   Three.js 基础场景
+   ============================================================ */
+const stageEl = $('stage');
+const canvasEl = $('view');
+
+const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearAlpha(0);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(38, 1, 0.02, 200);
+camera.position.set(0, 0, 2.4);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.9;
+controls.panSpeed = 0.8;
+controls.minDistance = 0.25;
+controls.maxDistance = 20;
+controls.autoRotateSpeed = 1.6;
+controls.addEventListener('start', () => { state.interacting = true; });
+controls.addEventListener('end', () => { state.interacting = false; });
+
+/* 灯光：环境光保证照片原色可见，方向光提供浮雕阴影 */
+const hemi = new THREE.HemisphereLight(0xffffff, 0x2b3345, 0.85);
+const ambient = new THREE.AmbientLight(0xffffff, 1.15);
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.3);
+keyLight.position.set(1.4, 1.9, 2.6);
+const fillLight = new THREE.DirectionalLight(0xa9c8ff, 1.05);
+fillLight.position.set(-2.2, -0.5, 1.4);
+const rimLight = new THREE.DirectionalLight(0xffd9b5, 0.95);
+rimLight.position.set(0.2, -1.7, -2.4);
+scene.add(hemi, ambient, keyLight, fillLight, rimLight);
+
+const modelGroup = new THREE.Group();
+scene.add(modelGroup);
+
+function resize() {
+  const w = stageEl.clientWidth || 1;
+  const h = stageEl.clientHeight || 1;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stageEl);
+resize();
+
+let lastT = performance.now();
+let frameCount = 0;
+let fpsAcc = 0;
+
+function tick(now) {
+  requestAnimationFrame(tick);
+  const dt = now - lastT;
+  lastT = now;
+
+  frameCount++;
+  fpsAcc += dt;
+  if (fpsAcc >= 500) {
+    $('hudFps').textContent = Math.round((frameCount * 1000) / fpsAcc);
+    frameCount = 0;
+    fpsAcc = 0;
+  }
+
+  controls.autoRotate = $('chkRotate').checked && !state.interacting;
+  controls.update();
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(tick);
+
+/* ============================================================
+   UI 辅助
+   ============================================================ */
+let toastTimer = null;
+function toast(msg, type = 'info') {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type === 'error' ? ' err' : type === 'ok' ? ' ok' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, type === 'error' ? 6000 : 3200);
+}
+
+function setStatus(text, pct = null, tone = '') {
+  $('statusText').textContent = text;
+  $('statusText').title = text;
+  const bar = $('progressBar');
+  const pctEl = $('statusPct');
+  bar.classList.remove('indeterminate', 'done', 'error');
+
+  if (pct === null || pct === undefined) {
+    bar.classList.add('indeterminate');
+    bar.style.width = '';
+    pctEl.textContent = '';
+  } else if (pct >= 1) {
+    bar.classList.remove('indeterminate');
+    bar.style.width = '100%';
+    bar.classList.add(tone === 'error' ? 'error' : 'done');
+    pctEl.textContent = tone === 'error' ? '失败' : '完成';
+  } else {
+    bar.classList.remove('indeterminate');
+    bar.style.width = (pct * 100).toFixed(1) + '%';
+    pctEl.textContent = Math.round(pct * 100) + '%';
+  }
+}
+
+function setBusy(busy) {
+  state.busy = busy;
+  $('btnGenerate').disabled = busy || !hasInput();
+  $('btnGenerate').textContent = busy ? '生成中…' : '生成 3D 模型';
+  $('btnReset').disabled = !state.modelRoot;
+  $('btnExport').disabled = busy || !state.modelRoot;
+  $('btnClear').disabled = busy;
+  $('btnGenerate').title = !state.image ? '请先选择照片' : '';
+}
+
+function hasInput() {
+  return !!state.image;
+}
+
+const fmt = (n) => n.toLocaleString('en-US');
+
+/* 让滑块的渐变填充跟随数值 */
+function syncRangeFill(input) {
+  const min = parseFloat(input.min);
+  const max = parseFloat(input.max);
+  const v = parseFloat(input.value);
+  const p = ((v - min) / (max - min)) * 100;
+  input.style.setProperty('--fill', p + '%');
+}
+
+/* ============================================================
+   图片载入
+   ============================================================ */
+const fileInput = $('fileInput');
+const dropzone = $('dropzone');
+
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) loadFile(f);
+  fileInput.value = '';
+});
+
+['dragenter', 'dragover'].forEach((ev) =>
+  dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('drag'); })
+);
+['dragleave', 'drop'].forEach((ev) =>
+  dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); })
+);
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  dropzone.classList.remove('drag');
+  const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith('image/'));
+  if (f) loadFile(f);
+  else toast('请拖入图片文件', 'error');
+});
+
+// 整页拖拽
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+  if (e.defaultPrevented) return;
+  e.preventDefault();
+  const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith('image/'));
+  if (f) loadFile(f);
+});
+
+// 粘贴
+window.addEventListener('paste', (e) => {
+  const items = [...(e.clipboardData?.items || [])];
+  const it = items.find((i) => i.type.startsWith('image/'));
+  if (!it) return;
+  const f = it.getAsFile();
+  if (f) loadFile(f);
+});
+
+$('btnClear').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (state.busy) return;
+  resetAll();
+});
+
+function resetAll() {
+  state.file = null;
+  state.image = null;
+  state.texCanvas = null;
+  state.texPixels = null;
+  state.depthRaw = null;
+  if (state.tex) { state.tex.dispose(); state.tex = null; }
+  clearModel();
+  $('fileMeta').classList.add('hidden');
+  dropzone.classList.remove('hidden');
+  $('empty').classList.remove('hide');
+  $('hud').classList.remove('show');
+  $('hint').classList.remove('show');
+  $('depthPreviewWrap').classList.add('hidden');
+  $('hudVerts').textContent = '0';
+  $('hudTris').textContent = '0';
+  setStatus('等待上传照片', null);
+  setBusy(false);
+}
+
+function loadFile(file) {
+  if (!file.type.startsWith('image/')) { toast('不是有效的图片文件', 'error'); return; }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    state.file = file;
+    state.fileName = file.name || 'image.png';
+    state.image = img;
+
+    // 面板缩略图（先挂上 blob URL，再延迟回收）
+    const thumb = $('thumb');
+    thumb.src = url;
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    $('fmName').textContent = state.fileName;
+    $('fmSize').textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
+    $('fileMeta').classList.remove('hidden');
+    dropzone.classList.add('hidden');
+
+    // 纹理画布
+    buildTextureCanvas(img);
+    setBusy(false);
+
+    // 自动开始生成
+    generate();
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    toast('图片解码失败，换一张试试', 'error');
+  };
+  img.src = url;
+}
+
+/* 把图片画进画布，返回画布与像素 */
+function makeCanvas(img, maxSide) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  const scale = Math.min(1, maxSide / Math.max(iw, ih));
+  const w = Math.max(2, Math.round(iw * scale));
+  const h = Math.max(2, Math.round(ih * scale));
+
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  return { canvas: c, pixels: ctx.getImageData(0, 0, w, h).data };
+}
+
+function buildTextureCanvas(img) {
+  const { canvas, pixels } = makeCanvas(img, 1024);
+  state.texCanvas = canvas;
+  state.texPixels = pixels;
+
+  if (state.tex) state.tex.dispose();
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  tex.needsUpdate = true;
+  state.tex = tex;
+}
+
+/* ============================================================
+   参数绑定
+   ============================================================ */
+const rngStrength = $('rngStrength');
+const rngRes = $('rngRes');
+const rngSmooth = $('rngSmooth');
+
+rngStrength.addEventListener('input', () => {
+  state.params.strength = parseFloat(rngStrength.value);
+  $('valStrength').textContent = state.params.strength.toFixed(2);
+  syncRangeFill(rngStrength);
+  scheduleRebuild();
+});
+rngRes.addEventListener('input', () => {
+  state.params.resolution = parseInt(rngRes.value, 10);
+  $('valRes').textContent = rngRes.value;
+  syncRangeFill(rngRes);
+  scheduleRebuild();
+});
+rngSmooth.addEventListener('input', () => {
+  state.params.smooth = parseInt(rngSmooth.value, 10);
+  $('valSmooth').textContent = rngSmooth.value;
+  syncRangeFill(rngSmooth);
+  scheduleRebuild();
+});
+[rngStrength, rngRes, rngSmooth].forEach(syncRangeFill);
+
+$('chkInvert').addEventListener('change', (e) => {
+  state.params.invert = e.target.checked;
+  scheduleRebuild();
+});
+$('chkWire').addEventListener('change', (e) => {
+  state.params.wireframe = e.target.checked;
+  scheduleRebuild();
+});
+$('chkPoints').addEventListener('change', (e) => {
+  state.params.points = e.target.checked;
+  scheduleRebuild();
+});
+$('chkUnlit').addEventListener('change', (e) => {
+  state.params.unlit = e.target.checked;
+  scheduleRebuild();
+});
+
+let rebuildTimer = null;
+function scheduleRebuild() {
+  if (!state.depthRaw) return;
+  clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(() => buildModel(), 90);
+}
+
+$('btnReset').addEventListener('click', () => {
+  if (state.modelRoot) frameObject(state.modelRoot, true);
+});
+$('btnGenerate').addEventListener('click', () => generate());
+$('btnExport').addEventListener('click', exportGLB);
+
+/* ============================================================
+   生成主流程
+   ============================================================ */
+async function generate() {
+  if (!state.image || state.busy) return;
+  setBusy(true);
+  $('empty').classList.add('hide');
+
+  try {
+    await generateWithDepth();
+  } catch (err) {
+    console.error(err);
+    setStatus('生成失败：' + (err.message || err), 1, 'error');
+    toast('生成失败：' + (err.message || err), 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+/* ---------------- 引擎 A：浏览器端深度重建 ---------------- */
+const MODEL_ID = 'onnx-community/depth-anything-v2-small';
+let tfModule = null;
+let pipePromise = null;
+let forceWasm = false;
+
+async function loadTransformers() {
+  if (tfModule) return tfModule;
+  const m = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');
+  m.env.useBrowserCache = true;
+  tfModule = m;
+  return m;
+}
+
+async function getDepthPipeline(onStatus) {
+  if (pipePromise) return pipePromise;
+
+  pipePromise = (async () => {
+    const tf = await loadTransformers();
+
+    // 优先使用随项目附带的本地模型（models/ 目录），彻底离线；
+    // 缺失时再回退到在线下载（国内镜像 / huggingface.co）。
+    const localBase = new URL('models/', document.baseURI).href;
+    tf.env.localModelPath = localBase;
+    tf.env.allowLocalModels = await hasLocalModel();
+    tf.env.allowRemoteModels = !tf.env.allowLocalModels;
+
+    const hasGPU = 'gpu' in navigator && !forceWasm;
+    const attempts = [];
+    if (hasGPU) attempts.push({ device: 'webgpu', dtype: 'fp16' });
+    if (tf.env.allowLocalModels) {
+      attempts.push({ device: 'wasm', dtype: 'q8' });          // 本地只带了 fp16 + q8
+    } else {
+      if (hasGPU) attempts.push({ device: 'webgpu', dtype: 'fp32' });
+      attempts.push({ device: 'wasm', dtype: 'q8' });
+      attempts.push({ device: 'wasm', dtype: 'fp32' });
+    }
+
+    // 国内网络通常无法直连 huggingface.co，优先走镜像，失败再回退
+    const hosts = $('chkMirror').checked
+      ? ['https://hf-mirror.com', 'https://huggingface.co']
+      : ['https://huggingface.co', 'https://hf-mirror.com'];
+
+    let lastErr = null;
+    for (const host of tf.env.allowLocalModels ? [null] : hosts) {
+      if (host) tf.env.remoteHost = host;
+      for (const attempt of attempts) {
+        try {
+          const where = tf.env.allowLocalModels ? '本地' : (host || '').replace('https://', '');
+          onStatus(`加载深度模型 · ${where} ${attempt.device}/${attempt.dtype}`);
+          const pipe = await tf.pipeline('depth-estimation', MODEL_ID, {
+            ...attempt,
+            progress_callback: (p) => {
+              if (p.status === 'progress' && p.total) {
+                const ratio = p.loaded / p.total;
+                const file = (p.file || '').split('/').pop();
+                const verb = tf.env.allowLocalModels ? '读取模型' : '下载模型';
+                setStatus(`${verb} ${file} (${attempt.device}/${attempt.dtype})`, Math.min(ratio, 0.99));
+              } else if (p.status === 'ready') {
+                setStatus('模型就绪 · 开始推理', null);
+              }
+            },
+          });
+          return pipe;
+        } catch (e) {
+          lastErr = e;
+          console.warn('[pipeline] 尝试失败', host, attempt, e);
+        }
+      }
+    }
+    throw new Error(
+      '深度模型加载失败（' + (lastErr?.message || lastErr) + '）。请确认 models/ 目录完整，或检查网络后重试。'
+    );
+  })();
+
+  pipePromise.catch(() => { pipePromise = null; });
+  return pipePromise;
+}
+
+/* 本地模型是否就绪（models/onnx-community/depth-anything-v2-small/config.json） */
+let localModelCheck = null;
+function hasLocalModel() {
+  if (localModelCheck) return localModelCheck;
+  const probe = new URL('models/' + MODEL_ID + '/config.json', document.baseURI).href;
+  localModelCheck = fetch(probe, { cache: 'no-store' })
+    .then((r) => r.ok)
+    .catch(() => false);
+  return localModelCheck;
+}
+
+/* 对一张画布做单目深度估计 */
+async function estimateDepth(srcCanvas, tag = '') {
+  const tf0 = await loadTransformers();
+  const blob = await new Promise((res) => srcCanvas.toBlob(res, 'image/jpeg', 0.94));
+
+  // WebGPU 在少数驱动上会输出异常值，甚至直接抛错
+  // （如 createBuffer failed: size ... too large when mappedAtCreation == true）。
+  // 这里捕获整轮推理：失败或结果不可信都重建 WASM 管线重试，避免整次生成失败。
+  let depth = null;
+  let lastErr = null;
+  for (let round = 0; round < 2; round++) {
+    const pipe = await getDepthPipeline((t) => setStatus(tag + t, null));
+
+    setStatus(tag + (round === 0 ? '单目深度估计中…' : '回退 WASM 重新推理…'), null);
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+
+    try {
+      const rawImage = await tf0.RawImage.fromBlob(blob);
+      const output = await pipe(rawImage);
+      const candidate = extractDepth(output);
+
+      if (isSaneDepth(candidate.data)) {
+        depth = candidate;
+        break;
+      }
+      console.warn('[depth] 输出异常，回退到 WASM 重试');
+      lastErr = new Error('深度输出数值异常');
+    } catch (e) {
+      console.error('[depth] 推理失败，回退到 WASM 重试', e);
+      lastErr = e;
+    }
+
+    pipePromise = null;
+    forceWasm = true;
+  }
+
+  if (!depth) {
+    const msg = lastErr?.message || lastErr || '未知错误';
+    throw new Error(`深度推理失败：${msg}。已尝试回退到 WASM，请刷新页面后重试。`);
+  }
+  return depth;
+}
+
+async function generateWithDepth() {
+  setStatus('准备图像…', 0.03);
+  const depth = await estimateDepth(state.texCanvas);
+  const norm = normalizeDepth(depth.data);
+
+  state.depthRaw = { data: norm, w: depth.w, h: depth.h };
+
+  setStatus('深度估计完成 · 构建网格…', 0.9);
+  drawDepthPreview(norm, depth.w, depth.h);
+
+  state.needFrame = true;
+  buildModel();
+  setStatus('完成 · 可拖拽旋转查看', 1);
+  toast('3D 模型已生成', 'ok');
+}
+
+/* 深度图是否可用：绝大多数值有限，且确实存在起伏 */
+function isSaneDepth(arr) {
+  let finite = 0;
+  let mn = Infinity;
+  let mx = -Infinity;
+  const step = Math.max(1, Math.floor(arr.length / 20000));
+  let sampled = 0;
+  for (let i = 0; i < arr.length; i += step) {
+    sampled++;
+    const v = arr[i];
+    if (!Number.isFinite(v)) continue;
+    finite++;
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+  }
+  if (!sampled) return false;
+  const finiteRatio = finite / sampled;
+  const span = mx - mn;
+  return finiteRatio > 0.98 && Number.isFinite(span) && span > 1e-6;
+}
+
+function extractDepth(output) {
+  // 优先使用张量输出（保留原始相对深度）
+  const t = output?.predicted_depth;
+  if (t && t.data) {
+    const dims = t.dims || [];
+    const h = dims[dims.length - 2];
+    const w = dims[dims.length - 1];
+    if (w > 1 && h > 1) {
+      return { data: Float32Array.from(t.data), w, h };
+    }
+  }
+  // 退化到归一化后的灰度图
+  const img = output?.depth;
+  if (img && img.data) {
+    const { width: w, height: h, channels: c, data } = img;
+    const arr = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) arr[i] = data[i * c];
+    return { data: arr, w, h };
+  }
+  throw new Error('无法解析深度模型输出');
+}
+
+function normalizeDepth(arr) {
+  let mn = Infinity;
+  let mx = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (!Number.isFinite(v)) continue;
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+  }
+  const span = mx - mn || 1;
+  const out = new Float32Array(arr.length);
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    out[i] = Number.isFinite(v) ? (v - mn) / span : 0;
+  }
+  return out;
+}
+
+/* 可分离盒式模糊（深度图去噪） */
+function boxBlur(src, w, h, r) {
+  if (r <= 0) return src;
+  const tmp = new Float32Array(src.length);
+  const out = new Float32Array(src.length);
+  const norm = 1 / (2 * r + 1);
+
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sum = 0;
+    for (let k = -r; k <= r; k++) {
+      const x = k < 0 ? 0 : k > w - 1 ? w - 1 : k;
+      sum += src[row + x];
+    }
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = sum * norm;
+      let xa = x + r + 1; if (xa > w - 1) xa = w - 1;
+      let xs = x - r; if (xs < 0) xs = 0;
+      sum += src[row + xa] - src[row + xs];
+    }
+  }
+
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let k = -r; k <= r; k++) {
+      const y = k < 0 ? 0 : k > h - 1 ? h - 1 : k;
+      sum += tmp[y * w + x];
+    }
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = sum * norm;
+      let ya = y + r + 1; if (ya > h - 1) ya = h - 1;
+      let ys = y - r; if (ys < 0) ys = 0;
+      sum += tmp[ya * w + x] - tmp[ys * w + x];
+    }
+  }
+  return out;
+}
+
+function sampleBilinear(data, w, h, u, v) {
+  const x = Math.min(Math.max(u * (w - 1), 0), w - 1);
+  const y = Math.min(Math.max(v * (h - 1), 0), h - 1);
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const x1 = Math.min(x0 + 1, w - 1);
+  const y1 = Math.min(y0 + 1, h - 1);
+  const fx = x - x0;
+  const fy = y - y0;
+  const a = data[y0 * w + x0];
+  const b = data[y0 * w + x1];
+  const c = data[y1 * w + x0];
+  const d = data[y1 * w + x1];
+  return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+}
+
+function drawDepthPreview(data, w, h) {
+  const cv = $('depthCanvas');
+  cv.width = w;
+  cv.height = h;
+  const ctx = cv.getContext('2d');
+  const im = ctx.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    const g = Math.round(data[i] * 255);
+    im.data[i * 4] = g;
+    im.data[i * 4 + 1] = g;
+    im.data[i * 4 + 2] = g;
+    im.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+  $('depthPreviewWrap').classList.remove('hidden');
+}
+
+/* ---------------- 网格构建 ---------------- */
+/* sRGB → 线性 查找表（顶点色用） */
+const SRGB2LIN = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const c = i / 255;
+  SRGB2LIN[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+let pointSprite = null;
+function getPointSprite() {
+  if (pointSprite) return pointSprite;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.55, 'rgba(255,255,255,1)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(32, 32, 32, 0, Math.PI * 2);
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  pointSprite = tex;
+  return tex;
+}
+
+function buildModel() {
+  if (!state.depthRaw || !state.texCanvas || !state.tex) return;
+  const P = state.params;
+  const { data, w, h } = state.depthRaw;
+
+  const depth = P.smooth > 0 ? boxBlur(data, w, h, P.smooth) : data;
+
+  const texW = state.texCanvas.width;
+  const texH = state.texCanvas.height;
+  const aspect = texW / texH;
+
+  const long = P.resolution;
+  let cols, rows;
+  if (aspect >= 1) {
+    cols = long;
+    rows = Math.max(2, Math.round(long / aspect));
+  } else {
+    rows = long;
+    cols = Math.max(2, Math.round(long * aspect));
+  }
+
+  const planeW = aspect >= 1 ? 1 : aspect;
+  const planeH = aspect >= 1 ? 1 / aspect : 1;
+
+  const count = (cols + 1) * (rows + 1);
+  const positions = new Float32Array(count * 3);
+  const uvs = new Float32Array(count * 2);
+  const colors = new Float32Array(count * 3);
+
+  const px = state.texPixels;
+  let k = 0;
+  for (let j = 0; j <= rows; j++) {
+    const v = j / rows;                       // 0 = 图片顶部
+    for (let i = 0; i <= cols; i++) {
+      const u = i / cols;
+      let d = sampleBilinear(depth, w, h, u, v);
+      if (P.invert) d = 1 - d;
+
+      const x = (u - 0.5) * planeW;
+      const y = (0.5 - v) * planeH;
+      const z = (d - 0.5) * P.strength;
+
+      positions[k * 3] = x;
+      positions[k * 3 + 1] = y;
+      positions[k * 3 + 2] = z;
+
+      uvs[k * 2] = u;
+      uvs[k * 2 + 1] = 1 - v;
+
+      const sx = Math.min(texW - 1, (u * texW) | 0);
+      const sy = Math.min(texH - 1, (v * texH) | 0);
+      const o = (sy * texW + sx) * 4;
+      // 顶点色需由 sRGB 转到线性空间，否则点云会发白
+      colors[k * 3] = SRGB2LIN[px[o]];
+      colors[k * 3 + 1] = SRGB2LIN[px[o + 1]];
+      colors[k * 3 + 2] = SRGB2LIN[px[o + 2]];
+
+      k++;
+    }
+  }
+
+  const indexCount = cols * rows * 6;
+  const indices = new Uint32Array(indexCount);
+  let t = 0;
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const a = j * (cols + 1) + i;
+      const b = a + 1;
+      const c = a + cols + 1;
+      const d = c + 1;
+      indices[t++] = a; indices[t++] = c; indices[t++] = b;
+      indices[t++] = b; indices[t++] = c; indices[t++] = d;
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setIndex(new THREE.BufferAttribute(indices, 1));
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+
+  let object;
+  if (P.points) {
+    const mat = new THREE.PointsMaterial({
+      size: (planeW / cols) * 1.6,
+      sizeAttenuation: true,
+      vertexColors: true,
+      map: getPointSprite(),
+      transparent: true,
+      alphaTest: 0.25,
+      depthWrite: true,
+    });
+    object = new THREE.Points(geo, mat);
+  } else if (P.wireframe) {
+    object = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color: 0x7fd6ff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.7,
+    }));
+  } else {
+    const mat = P.unlit
+      ? new THREE.MeshBasicMaterial({ map: state.tex, side: THREE.DoubleSide })
+      : new THREE.MeshStandardMaterial({
+          map: state.tex,
+          roughness: 0.92,
+          metalness: 0.02,
+          side: THREE.DoubleSide,
+          emissive: new THREE.Color(0xffffff),
+          emissiveMap: state.tex,
+          emissiveIntensity: 0.52,
+        });
+    object = new THREE.Mesh(geo, mat);
+  }
+
+  object.name = 'reconstructed';
+  installModel(object);
+}
+
+/* 把新模型挂到场景中（释放旧资源） */
+function installModel(object) {
+  disposeChildren(modelGroup);
+
+  const wrapper = new THREE.Group();
+  wrapper.add(object);
+  modelGroup.add(wrapper);
+  state.modelRoot = wrapper;
+
+  updateHud(object);
+
+  if (state.needFrame) {
+    frameObject(wrapper, true);
+    state.needFrame = false;
+  }
+
+  $('empty').classList.add('hide');
+  $('hud').classList.add('show');
+  $('hint').classList.add('show');
+  $('btnReset').disabled = false;
+  $('btnExport').disabled = false;
+}
+
+function disposeChildren(root) {
+  for (let i = root.children.length - 1; i >= 0; i--) {
+    const child = root.children[i];
+    root.remove(child);
+    child.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach((m) => {
+          // 纹理是共享的，只释放材质本身
+          m.dispose();
+        });
+      }
+    });
+  }
+}
+
+function clearModel() {
+  disposeChildren(modelGroup);
+  state.modelRoot = null;
+  $('btnReset').disabled = true;
+  $('btnExport').disabled = true;
+}
+
+function updateHud(object) {
+  let verts = 0;
+  let tris = 0;
+  object.traverse((o) => {
+    if (o.geometry) {
+      const g = o.geometry;
+      const pos = g.getAttribute('position');
+      if (pos) verts += pos.count;
+      if (g.index) tris += g.index.count / 3;
+      else if (pos) tris += pos.count / 3;
+    }
+  });
+  $('hudVerts').textContent = fmt(Math.round(verts));
+  $('hudTris').textContent = fmt(Math.round(tris));
+}
+
+/* 根据包围盒自动取景 */
+function frameObject(obj, animate = false) {
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(size.x, size.y, size.z) * 0.5 || 0.5;
+
+  const fov = (camera.fov * Math.PI) / 180;
+  const dist = (radius / Math.sin(fov / 2)) * 1.18;
+
+  controls.target.copy(center);
+  // 略微偏侧的初始视角，让立体起伏一眼可见（正视会看起来像平面照片）
+  const dir = new THREE.Vector3(0.30, 0.16, 0.94).normalize();
+  camera.position.copy(center).addScaledVector(dir, dist);
+  camera.near = Math.max(0.005, dist / 200);
+  camera.far = dist * 80;
+  camera.updateProjectionMatrix();
+
+  controls.minDistance = radius * 0.4;
+  controls.maxDistance = dist * 7;
+  controls.update();
+}
+
+/* ============================================================
+   导出 GLB
+   ============================================================ */
+function exportGLB() {
+  if (!state.modelRoot) return;
+  setStatus('导出中…', null);
+  const exporter = new GLTFExporter();
+  exporter.parse(
+    state.modelRoot,
+    (result) => {
+      const blob = new Blob([result], { type: 'model/gltf-binary' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (state.fileName || 'model').replace(/\.[^.]+$/, '') + '.glb';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setStatus('已导出 GLB', 1);
+      toast('已导出 GLB 文件', 'ok');
+    },
+    (err) => {
+      console.error(err);
+      setStatus('导出失败', 1, 'error');
+      toast('导出失败：' + (err?.message || err), 'error');
+    },
+    { binary: true }
+  );
+}
+
+/* 初始化 */
+setBusy(false);
+setStatus('等待上传照片', null);
+</script>
+</body>
+</html>
