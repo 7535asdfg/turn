@@ -1,0 +1,9 @@
+# 运行/测试生成的文件
+tests/synthetic/
+tests/__pycache__/
+__pycache__/
+*.pyc
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db

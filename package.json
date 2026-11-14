@@ -1,0 +1,9 @@
+{
+  "name": "pic2mesh",
+  "private": true,
+  "type": "module",
+  "description": "Pic2Mesh 单图 / 多视角 3D 重建（纯前端，无构建）",
+  "scripts": {
+    "test:sfm": "node tests/run_test.mjs"
+  }
+}

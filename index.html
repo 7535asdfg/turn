@@ -312,6 +312,86 @@
 
   .hidden{display:none!important;}
 
+  /* ---------------- 多角度模式 ---------------- */
+  .mode-switch{
+    display:flex;gap:4px;padding:4px;border:1px solid var(--stroke);
+    border-radius:12px;background:rgba(255,255,255,.035);
+  }
+  .mode-tab{
+    flex:1;padding:8px 6px;border-radius:9px;
+    font-size:12px;font-weight:600;color:var(--muted);
+    transition:background .18s,color .18s,box-shadow .18s;
+    white-space:nowrap;
+  }
+  .mode-tab:hover{color:#cbd5e6;background:rgba(255,255,255,.05);}
+  .mode-tab.active{
+    background:linear-gradient(135deg,rgba(110,231,255,.92),rgba(157,180,255,.92) 55%,rgba(139,124,255,.92));
+    color:#06121a;
+    box-shadow:0 8px 20px -10px rgba(110,231,255,.9);
+  }
+  .mode-tab:disabled{opacity:.5;cursor:not-allowed;}
+
+  .multi-thumbs{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));
+    gap:6px;margin-top:10px;max-height:140px;overflow-y:auto;
+    scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent;
+  }
+  .multi-thumb{
+    position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;
+    border:1px solid var(--stroke);background:#000;
+  }
+  .multi-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .multi-thumb .rm{
+    position:absolute;top:2px;right:2px;width:17px;height:17px;border-radius:50%;
+    background:rgba(0,0,0,.68);color:#fff;font-size:12px;line-height:1;
+    display:grid;place-items:center;border:1px solid rgba(255,255,255,.18);
+  }
+  .multi-thumb .rm:hover{background:rgba(255,80,80,.8);}
+  .multi-thumb .idx{
+    position:absolute;left:3px;bottom:2px;font-size:9px;color:#dbe4f3;
+    background:rgba(0,0,0,.58);padding:0 4px;border-radius:4px;
+    font-variant-numeric:tabular-nums;
+  }
+  .multi-count{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:11px;color:var(--muted);margin-top:8px;
+  }
+  .multi-count b{color:var(--accent);font-variant-numeric:tabular-nums;}
+  .link-btn{font-size:11px;color:#9fb4d0;text-decoration:underline;text-underline-offset:2px;}
+  .link-btn:hover{color:var(--accent);}
+
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;}
+  .stat{
+    background:rgba(255,255,255,.04);border:1px solid var(--stroke);
+    border-radius:9px;padding:7px 9px;
+  }
+  .stat span{display:block;font-size:10px;color:var(--muted);}
+  .stat b{font-size:13px;color:#e3ebf7;font-variant-numeric:tabular-nums;font-weight:600;}
+
+  select{
+    width:100%;padding:8px 10px;border-radius:9px;
+    background:rgba(255,255,255,.05);border:1px solid var(--stroke);
+    color:var(--text);font:inherit;font-size:12px;outline:none;cursor:pointer;
+  }
+  select:focus{border-color:rgba(110,231,255,.55);}
+  .field-row{margin-top:12px;}
+  .field-row > label{display:block;font-size:12px;color:#c2cadb;margin-bottom:5px;}
+  .field-hint{font-size:10.5px;color:var(--muted);margin-top:5px;line-height:1.5;}
+  .btn.danger{
+    background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.4);
+    color:#ffb3b3;font-weight:600;
+  }
+  .btn.danger:hover:not(:disabled){background:rgba(255,107,107,.2);}
+
+
+  /* 多角度模式：把进度与操作放到面板顶部，避免大图集把按钮挤出视口 */
+  #panel.mode-multi .status-card{order:2;}
+  #panel.mode-multi #actionCard{order:3;}
+  #panel.mode-multi #multiUploadCard{order:4;}
+  #panel.mode-multi #multiParamsCard{order:5;}
+  #panel.mode-multi #displayCard{order:6;}
+  #panel.mode-multi .foot{order:7;}
+
   @media (max-width:880px){
     #app{flex-direction:column-reverse;}
     #panel{
@@ -337,12 +417,17 @@
       </div>
       <div>
         <h1>Pic2Mesh</h1>
-        <p>单张照片 → 可旋转的 3D 效果图</p>
+        <p>照片 → 可旋转的 3D 模型</p>
       </div>
     </header>
 
-    <!-- 上传 -->
-    <section class="card">
+    <div class="mode-switch" role="tablist" aria-label="重建模式">
+      <button class="mode-tab active" data-mode="single" role="tab">单张照片</button>
+      <button class="mode-tab" data-mode="multi" role="tab">多角度重建</button>
+    </div>
+
+    <!-- 上传（单图） -->
+    <section class="card" id="singleUploadCard">
       <div id="dropzone" class="dropzone">
         <input type="file" id="fileInput" accept="image/*" hidden />
         <div class="dz-icon">
@@ -365,8 +450,34 @@
       </div>
     </section>
 
-    <!-- 参数 -->
-    <section class="card">
+    <!-- 上传（多角度） -->
+    <section class="card hidden" id="multiUploadCard">
+      <div id="multiDropzone" class="dropzone">
+        <input type="file" id="multiFileInput" accept="image/*" multiple hidden />
+        <div class="dz-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z" stroke="currentColor"/>
+            <path d="M4 7.5 12 12l8-4.5M12 12v9" stroke="currentColor"/>
+          </svg>
+        </div>
+        <div class="dz-title">选择多张照片</div>
+        <div class="dz-sub">同一物体环绕拍摄 · 建议 12–36 张 · 相邻重叠 70% 以上</div>
+      </div>
+
+      <div id="multiThumbs" class="multi-thumbs hidden"></div>
+
+      <div id="multiCountRow" class="multi-count hidden">
+        <span>已选择 <b id="multiCount">0</b> 张</span>
+        <button id="btnClearMulti" class="link-btn">清空</button>
+      </div>
+
+      <p class="hint" style="margin-top:9px">
+        SfM 会自动匹配相邻照片并估计每张照片的相机位姿；拍摄时请保持焦距一致、光线均匀，围绕物体转一圈。
+      </p>
+    </section>
+
+    <!-- 参数（单图） -->
+    <section class="card" id="singleParamsCard">
       <div class="card-title">重建参数</div>
       <div class="slider-row">
         <div class="slider-head"><span>深度强度</span><b id="valStrength">0.32</b></div>
@@ -385,8 +496,36 @@
       <p class="hint" style="margin-top:6px">模型已随项目打包在 <code>models/</code>，默认完全离线运行。</p>
     </section>
 
+    <!-- 参数（多角度） -->
+    <section class="card hidden" id="multiParamsCard">
+      <div class="card-title">SfM + MVS 参数</div>
+
+      <div class="slider-row">
+        <div class="slider-head"><span>匹配窗口</span><b id="valMatchWindow">3</b></div>
+        <input type="range" id="rngMatchWindow" min="1" max="6" step="1" value="3" />
+      </div>
+      <p class="field-hint" style="margin-top:2px">每张照片与前后 N 张做特征匹配。顺序拍摄时 2–4 即可。</p>
+
+      <div class="field-row">
+        <label for="selMvsQuality">稠密重建精度</label>
+        <select id="selMvsQuality">
+          <option value="fast">快速 · 体素 112（预览）</option>
+          <option value="standard" selected>标准 · 体素 128</option>
+          <option value="high">精细 · 体素 160（较慢）</option>
+        </select>
+      </div>
+
+      <label class="checkline" style="margin-top:11px"><input type="checkbox" id="chkDense" checked /> 生成稠密网格（MVS）</label>
+      <label class="checkline"><input type="checkbox" id="chkShowCameras" checked /> 显示相机视锥</label>
+      <label class="checkline"><input type="checkbox" id="chkShowSparse" checked /> 显示稀疏点云</label>
+
+      <p class="hint" style="margin-top:7px">
+        多视角 SfM 估计相机位姿与稀疏点云；MVS 用平面扫描 + TSDF 融合生成稠密网格。
+      </p>
+    </section>
+
     <!-- 显示 -->
-    <section class="card">
+    <section class="card" id="displayCard">
       <div class="card-title">显示</div>
       <div class="toggle-grid">
         <label class="checkline"><input type="checkbox" id="chkRotate" checked /> 自动旋转</label>
@@ -397,11 +536,14 @@
     </section>
 
     <!-- 操作 -->
-    <section class="card">
+    <section class="card" id="actionCard">
       <button id="btnGenerate" class="btn primary" disabled>生成 3D 模型</button>
       <div class="btn-row">
         <button id="btnReset" class="btn ghost" disabled>重置视角</button>
         <button id="btnExport" class="btn ghost" disabled>导出 GLB</button>
+      </div>
+      <div class="btn-row hidden" id="cancelRow">
+        <button id="btnCancel" class="btn danger">取消当前重建</button>
       </div>
     </section>
 
@@ -416,9 +558,15 @@
         <div class="card-title small" style="margin-top:4px">深度图</div>
         <canvas id="depthCanvas"></canvas>
       </div>
+      <div id="multiStats" class="stats-grid hidden">
+        <div class="stat"><span>相机</span><b id="statCams">–</b></div>
+        <div class="stat"><span>稀疏点</span><b id="statSparse">–</b></div>
+        <div class="stat"><span>稠密顶点</span><b id="statVerts">–</b></div>
+        <div class="stat"><span>三角面</span><b id="statTris">–</b></div>
+      </div>
     </section>
 
-    <footer class="foot">
+    <footer class="foot" id="footNote">
       Depth Anything V2（ONNX）单目深度估计 → 网格 + 纹理重建，<br/>
       全部在浏览器本地完成，照片不会上传。
     </footer>
@@ -440,8 +588,8 @@
 
     <div id="empty" class="empty">
       <div class="empty-ring"></div>
-      <h2>上传一张照片开始重建</h2>
-      <p>算法会自动估计照片的深度信息，并生成可自由旋转、缩放、平移的 3D 效果图</p>
+      <h2 id="emptyTitle">上传一张照片开始重建</h2>
+      <p id="emptyText">算法会自动估计照片的深度信息，并生成可自由旋转、缩放、平移的 3D 效果图</p>
     </div>
   </main>
 </div>
@@ -459,6 +607,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { reconstruct as sfmReconstruct } from './js/core/sfm.js';
+import { reconstructDense } from './js/core/mvs.js';
+import { focalFromJpegBuffer, focalFromFov } from './js/core/image.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -466,6 +617,7 @@ const $ = (id) => document.getElementById(id);
    全局状态
    ============================================================ */
 const state = {
+  mode: 'single',
   file: null,
   fileName: '',
   image: null,           // HTMLImageElement
@@ -486,6 +638,21 @@ const state = {
     points: false,
     unlit: false,
   },
+};
+
+const multi = {
+  files: [],             // { id, file, name, thumb, width, height, rgba, focal, fovFallback }
+  params: { matchWindow: 3, quality: 'standard', dense: true, showCameras: true, showSparse: true },
+  running: false,
+  cancel: false,
+  result: null,          // SfM 结果
+  dense: null,           // MVS 结果
+  sparsePoints: null,
+  cameraLines: null,
+  mesh: null,
+  meshPoints: null,
+  meshUnlit: null,
+  seq: 0,
 };
 
 /* ============================================================
@@ -529,6 +696,10 @@ scene.add(hemi, ambient, keyLight, fillLight, rimLight);
 
 const modelGroup = new THREE.Group();
 scene.add(modelGroup);
+
+const multiGroup = new THREE.Group();
+multiGroup.visible = false;
+scene.add(multiGroup);
 
 function resize() {
   const w = stageEl.clientWidth || 1;
@@ -601,15 +772,29 @@ function setStatus(text, pct = null, tone = '') {
 function setBusy(busy) {
   state.busy = busy;
   $('btnGenerate').disabled = busy || !hasInput();
-  $('btnGenerate').textContent = busy ? '生成中…' : '生成 3D 模型';
-  $('btnReset').disabled = !state.modelRoot;
-  $('btnExport').disabled = busy || !state.modelRoot;
+  $('btnGenerate').textContent = busy
+    ? (state.mode === 'multi' ? '多角度重建中…' : '生成中…')
+    : (state.mode === 'multi' ? '开始多角度重建' : '生成 3D 模型');
+  $('btnReset').disabled = !currentModelRoot();
+  $('btnExport').disabled = busy || !currentModelRoot();
   $('btnClear').disabled = busy;
-  $('btnGenerate').title = !state.image ? '请先选择照片' : '';
+  $('btnClearMulti').disabled = busy;
+  $('btnGenerate').title = !hasInput()
+    ? (state.mode === 'multi' ? '请至少选择 2 张照片' : '请先选择照片')
+    : '';
+  $('cancelRow').classList.toggle('hidden', !(busy && state.mode === 'multi'));
+  document.querySelectorAll('.mode-tab').forEach((b) => { b.disabled = busy || multi.running; });
 }
 
 function hasInput() {
-  return !!state.image;
+  return state.mode === 'multi' ? multi.files.length >= 2 : !!state.image;
+}
+
+function currentModelRoot() {
+  if (state.mode === 'multi') {
+    return multi.dense ? (multi.mesh || multi.meshPoints) : (multi.sparsePoints || multi.cameraLines);
+  }
+  return state.modelRoot;
 }
 
 const fmt = (n) => n.toLocaleString('en-US');
@@ -656,17 +841,24 @@ window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => {
   if (e.defaultPrevented) return;
   e.preventDefault();
-  const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith('image/'));
-  if (f) loadFile(f);
+  const files = [...(e.dataTransfer?.files || [])].filter((x) => x.type.startsWith('image/'));
+  if (!files.length) return;
+  if (state.mode === 'multi') addMultiFiles(files);
+  else if (files.length > 1 && !state.busy) { setMode('multi'); addMultiFiles(files); }
+  else loadFile(files[0]);
 });
 
 // 粘贴
 window.addEventListener('paste', (e) => {
   const items = [...(e.clipboardData?.items || [])];
-  const it = items.find((i) => i.type.startsWith('image/'));
-  if (!it) return;
-  const f = it.getAsFile();
-  if (f) loadFile(f);
+  const files = items
+    .filter((i) => i.type.startsWith('image/'))
+    .map((i) => i.getAsFile())
+    .filter(Boolean);
+  if (!files.length) return;
+  if (state.mode === 'multi') addMultiFiles(files);
+  else if (files.length > 1 && !state.busy) { setMode('multi'); addMultiFiles(files); }
+  else loadFile(files[0]);
 });
 
 $('btnClear').addEventListener('click', (e) => {
@@ -789,29 +981,602 @@ $('chkInvert').addEventListener('change', (e) => {
 });
 $('chkWire').addEventListener('change', (e) => {
   state.params.wireframe = e.target.checked;
+  applyMultiDisplay();
   scheduleRebuild();
 });
 $('chkPoints').addEventListener('change', (e) => {
   state.params.points = e.target.checked;
+  applyMultiDisplay();
   scheduleRebuild();
 });
 $('chkUnlit').addEventListener('change', (e) => {
   state.params.unlit = e.target.checked;
+  applyMultiDisplay();
   scheduleRebuild();
 });
 
 let rebuildTimer = null;
 function scheduleRebuild() {
-  if (!state.depthRaw) return;
+  if (state.mode !== 'single' || !state.depthRaw) return;
   clearTimeout(rebuildTimer);
   rebuildTimer = setTimeout(() => buildModel(), 90);
 }
 
 $('btnReset').addEventListener('click', () => {
-  if (state.modelRoot) frameObject(state.modelRoot, true);
+  const root = currentModelRoot();
+  if (root) frameObject(root, true);
 });
-$('btnGenerate').addEventListener('click', () => generate());
+$('btnGenerate').addEventListener('click', () => {
+  if (state.mode === 'multi') generateMulti();
+  else generate();
+});
 $('btnExport').addEventListener('click', exportGLB);
+
+/* ============================================================
+   多角度重建：模式切换 / 选图 / SfM + MVS / 可视化
+   ============================================================ */
+for (const tab of document.querySelectorAll('.mode-tab')) {
+  tab.addEventListener('click', () => setMode(tab.dataset.mode));
+}
+
+function setMode(mode) {
+  if (state.busy || multi.running || mode === state.mode) return;
+  state.mode = mode;
+  document.querySelectorAll('.mode-tab').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+    b.setAttribute('aria-selected', String(b.dataset.mode === mode));
+  });
+
+  const single = mode === 'single';
+  document.getElementById('panel').classList.toggle('mode-multi', !single);
+  $('singleUploadCard').classList.toggle('hidden', !single);
+  $('singleParamsCard').classList.toggle('hidden', !single);
+  $('multiUploadCard').classList.toggle('hidden', single);
+  $('multiParamsCard').classList.toggle('hidden', single);
+  $('multiStats').classList.toggle('hidden', single || !multi.result);
+  $('depthPreviewWrap').classList.toggle('hidden', !single || !state.depthRaw);
+
+  modelGroup.visible = single;
+  multiGroup.visible = !single;
+
+  $('emptyTitle').textContent = single ? '上传一张照片开始重建' : '上传多张不同角度的照片';
+  $('emptyText').textContent = single
+    ? '算法会自动估计照片的深度信息，并生成可自由旋转、缩放、平移的 3D 效果图'
+    : 'SfM 自动估计相机位姿与稀疏点云，MVS 融合多视角深度生成带纹理的 3D 网格';
+  $('footNote').innerHTML = single
+    ? 'Depth Anything V2（ONNX）单目深度估计 → 网格 + 纹理重建，<br/>全部在浏览器本地完成，照片不会上传。'
+    : 'COLMAP 式 SfM（ORB + 本质矩阵 + 增量式定位 + BA）<br/>+ MVS（平面扫描 + TSDF 融合 + Marching Tetrahedra）';
+  $('empty').classList.toggle('hide', single ? !!state.modelRoot : !!multi.result);
+  $('hud').classList.toggle('show', single ? !!state.modelRoot : !!multi.result);
+
+  // 显示/隐藏与模式相关的深度预览
+  $('fileMeta').classList.toggle('hidden', single ? !state.file : true);
+  $('dropzone').classList.toggle('hidden', single ? !state.file : true);
+  $('multiCountRow').classList.toggle('hidden', single || !multi.files.length);
+  $('multiThumbs').classList.toggle('hidden', single || !multi.files.length);
+
+  if (mode === 'single') {
+    setStatus(
+      state.modelRoot ? '完成 · 可拖拽旋转查看' : (state.file ? '等待生成' : '等待上传照片'),
+      state.modelRoot ? 1 : null
+    );
+    if (state.modelRoot) frameObject(state.modelRoot, true);
+    if (state.depthRaw) scheduleRebuild();
+  } else {
+    if (multi.result) {
+      setStatus(multi.dense ? '稠密网格已生成' : 'SfM 完成 · 可查看相机与稀疏点', 1);
+      frameObject(currentModelRoot(), true);
+    } else {
+      setStatus(multi.files.length ? `已选择 ${multi.files.length} 张照片` : '等待选择多角度照片', null);
+    }
+  }
+  setBusy(false);
+}
+
+/* ---------------- 多图读取 ---------------- */
+const MAX_MULTI_IMAGES = 40;
+const MULTI_MAX_SIDE = 720;
+
+function setStatusLight(text) {
+  $('statusText').textContent = text;
+  $('statusText').title = text;
+}
+
+async function decodeImageFile(file, maxSide) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const scale = Math.min(1, maxSide / Math.max(iw, ih));
+    const w = Math.max(2, Math.round(iw * scale));
+    const h = Math.max(2, Math.round(ih * scale));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+    const rgba = ctx.getImageData(0, 0, w, h).data;
+    // 缩略图
+    const tw = 120;
+    const th = Math.max(1, Math.round((h / w) * tw));
+    const tc = document.createElement('canvas');
+    tc.width = tw; tc.height = th;
+    tc.getContext('2d').drawImage(c, 0, 0, tw, th);
+    const thumb = tc.toDataURL('image/jpeg', 0.72);
+    return { width: w, height: h, rgba, iw, ih, thumb };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function addMultiFiles(fileList) {
+  if (state.busy || multi.running) return;
+  const incoming = [...fileList].filter((f) => f.type.startsWith('image/'));
+  if (!incoming.length) { toast('请选择图片文件', 'error'); return; }
+
+  const room = MAX_MULTI_IMAGES - multi.files.length;
+  if (room <= 0) { toast(`最多支持 ${MAX_MULTI_IMAGES} 张照片`, 'error'); return; }
+  const take = incoming.slice(0, room);
+  if (incoming.length > room) toast(`最多 ${MAX_MULTI_IMAGES} 张，已忽略多余照片`, 'error');
+
+  if (state.mode === 'multi') setStatusLight(`正在读取照片 0/${take.length}…`);
+  for (let i = 0; i < take.length; i++) {
+    const file = take[i];
+    const id = ++multi.seq;
+    try {
+      const img = await decodeImageFile(file, MULTI_MAX_SIDE);
+      let focal = null;
+      try {
+        const head = await file.slice(0, 256 * 1024).arrayBuffer();
+        const exif = focalFromJpegBuffer(head, img.iw, img.ih);
+        if (exif.focal && exif.focal > 0) {
+          // 原图焦距按对角线缩放到工作分辨率
+          const ratio = Math.hypot(img.width, img.height) / Math.hypot(img.iw, img.ih);
+          focal = exif.focal * ratio;
+        }
+      } catch { /* 无 EXIF */ }
+      if (!focal || !Number.isFinite(focal)) {
+        focal = focalFromFov(img.width, 55);
+      }
+      multi.files.push({
+        id, file, name: file.name || `photo_${id}.jpg`,
+        thumb: img.thumb, width: img.width, height: img.height,
+        rgba: img.rgba, focal,
+      });
+    } catch (err) {
+      console.warn('读取图片失败', file.name, err);
+    }
+    if (state.mode === 'multi') setStatusLight(`正在读取照片 ${i + 1}/${take.length}…`);
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  // 按文件名自然排序，保证相邻视角顺序
+  multi.files.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true, sensitivity: 'base' }));
+  renderMultiThumbs();
+  $('empty').classList.toggle('hide', state.mode !== 'multi' ? !!state.modelRoot : !!multi.result);
+  setBusy(false);
+  if (state.mode === 'multi') setStatus(`已选择 ${multi.files.length} 张照片 · 点击「开始多角度重建」`, null);
+}
+
+function renderMultiThumbs() {
+  const wrap = $('multiThumbs');
+  wrap.innerHTML = '';
+  const show = multi.files.length > 0;
+  wrap.classList.toggle('hidden', !show);
+  $('multiCountRow').classList.toggle('hidden', !show);
+  $('multiCount').textContent = String(multi.files.length);
+
+  multi.files.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'multi-thumb';
+    d.title = `${f.name} · ${f.width}×${f.height}`;
+    const img = document.createElement('img');
+    img.src = f.thumb;
+    img.alt = f.name;
+    const idx = document.createElement('div');
+    idx.className = 'idx';
+    idx.textContent = String(i + 1);
+    const rm = document.createElement('button');
+    rm.className = 'rm';
+    rm.textContent = '×';
+    rm.title = '移除';
+    rm.addEventListener('click', () => {
+      if (state.busy || multi.running) return;
+      multi.files = multi.files.filter((x) => x.id !== f.id);
+      renderMultiThumbs();
+      setBusy(false);
+      setStatus(multi.files.length ? `已选择 ${multi.files.length} 张照片` : '等待选择多角度照片', null);
+    });
+    d.append(img, idx, rm);
+    wrap.appendChild(d);
+  });
+}
+
+$('multiDropzone').addEventListener('click', () => $('multiFileInput').click());
+$('multiFileInput').addEventListener('change', (e) => {
+  const files = e.target.files;
+  if (files && files.length) addMultiFiles(files);
+  e.target.value = '';
+});
+['dragenter', 'dragover'].forEach((ev) => $('multiDropzone').addEventListener(ev, (e) => {
+  e.preventDefault(); $('multiDropzone').classList.add('drag');
+}));
+['dragleave', 'drop'].forEach((ev) => $('multiDropzone').addEventListener(ev, (e) => {
+  e.preventDefault(); $('multiDropzone').classList.remove('drag');
+}));
+$('multiDropzone').addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  addMultiFiles(e.dataTransfer?.files || []);
+});
+$('btnClearMulti').addEventListener('click', () => {
+  if (state.busy || multi.running) return;
+  multi.files = [];
+  clearMultiVisual();
+  renderMultiThumbs();
+  setStatus('等待选择多角度照片', null);
+  setBusy(false);
+});
+$('btnCancel').addEventListener('click', () => {
+  if (!multi.running) return;
+  multi.cancel = true;
+  setStatusLight('正在取消…');
+});
+
+/* 多角度参数 */
+const rngMatchWindow = $('rngMatchWindow');
+rngMatchWindow.addEventListener('input', () => {
+  multi.params.matchWindow = parseInt(rngMatchWindow.value, 10);
+  $('valMatchWindow').textContent = rngMatchWindow.value;
+  syncRangeFill(rngMatchWindow);
+});
+syncRangeFill(rngMatchWindow);
+$('selMvsQuality').addEventListener('change', (e) => {
+  multi.params.quality = e.target.value;
+});
+$('chkDense').addEventListener('change', (e) => {
+  multi.params.dense = e.target.checked;
+});
+$('chkShowCameras').addEventListener('change', (e) => {
+  multi.params.showCameras = e.target.checked;
+  if (multi.cameraLines) multi.cameraLines.visible = e.target.checked;
+});
+$('chkShowSparse').addEventListener('change', (e) => {
+  multi.params.showSparse = e.target.checked;
+  if (multi.sparsePoints) multi.sparsePoints.visible = e.target.checked;
+});
+
+/* ---------------- 可视化 ---------------- */
+function disposeGroup(root) {
+  for (let i = root.children.length - 1; i >= 0; i--) {
+    const child = root.children[i];
+    root.remove(child);
+    child.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach((m) => m.dispose());
+      }
+    });
+  }
+}
+
+function clearMultiVisual() {
+  disposeGroup(multiGroup);
+  multiGroup.position.set(0, 0, 0);
+  multiGroup.quaternion.identity();
+  multiGroup.scale.set(1, 1, 1);
+  multi.sparsePoints = null;
+  multi.cameraLines = null;
+  multi.mesh = null;
+  multi.meshPoints = null;
+  multi.meshUnlit = null;
+  multi.result = null;
+  multi.dense = null;
+  $('statCams').textContent = '–';
+  $('statSparse').textContent = '–';
+  $('statVerts').textContent = '–';
+  $('statTris').textContent = '–';
+  $('multiStats').classList.add('hidden');
+  $('hud').classList.remove('show');
+  $('empty').classList.toggle('hide', state.mode !== 'multi' ? !!state.modelRoot : false);
+  $('btnReset').disabled = true;
+  $('btnExport').disabled = true;
+}
+
+function bumpColor(c, out, off) {
+  out[off] = SRGB2LIN[Math.max(0, Math.min(255, c[0] | 0))];
+  out[off + 1] = SRGB2LIN[Math.max(0, Math.min(255, c[1] | 0))];
+  out[off + 2] = SRGB2LIN[Math.max(0, Math.min(255, c[2] | 0))];
+}
+
+function showSparseAndCameras(sfm) {
+  // 稀疏点
+  const n = sfm.points.length;
+  if (n) {
+    const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const p = sfm.points[i];
+      pos[i * 3] = p.X[0]; pos[i * 3 + 1] = p.X[1]; pos[i * 3 + 2] = p.X[2];
+      bumpColor(p.color, col, i * 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.computeBoundingSphere();
+    const sceneRadius = geo.boundingSphere ? geo.boundingSphere.radius : 0.5;
+    const mat = new THREE.PointsMaterial({
+      size: Math.max(0.0015, sceneRadius * 0.006), sizeAttenuation: true, vertexColors: true,
+      map: getPointSprite(), transparent: true, alphaTest: 0.2, depthWrite: true,
+    });
+    const pts = new THREE.Points(geo, mat);
+    pts.name = 'sparse-points';
+    pts.visible = multi.params.showSparse;
+    multiGroup.add(pts);
+    multi.sparsePoints = pts;
+  }
+
+  // 相机视锥
+  const cams = sfm.cameras;
+  if (cams.length) {
+    const verts = [];
+    // 估计场景尺度
+    let scale = 0;
+    for (const c of cams) {
+      const C = c.center;
+      scale = Math.max(scale, Math.hypot(C[0], C[1], C[2]));
+    }
+    if (!scale) scale = 1;
+    const depth = Math.max(0.03, scale * 0.055);
+    for (const cam of cams) {
+      const hw = depth * (cam.width / 2) / cam.f;
+      const hh = depth * (cam.height / 2) / cam.f;
+      const R = cam.R, t = cam.t;
+      const C = cam.center;
+      const world = (x, y, z) => [
+        R[0] * x + R[3] * y + R[6] * z - (R[0] * t[0] + R[3] * t[1] + R[6] * t[2]),
+        R[1] * x + R[4] * y + R[7] * z - (R[1] * t[0] + R[4] * t[1] + R[7] * t[2]),
+        R[2] * x + R[5] * y + R[8] * z - (R[2] * t[0] + R[5] * t[1] + R[8] * t[2]),
+      ];
+      const corners = [
+        world(-hw, -hh, depth), world(hw, -hh, depth),
+        world(hw, hh, depth), world(-hw, hh, depth),
+      ];
+      const apex = world(0, 0, 0);
+      for (let i = 0; i < 4; i++) {
+        const a = corners[i], b = corners[(i + 1) % 4];
+        verts.push(apex[0], apex[1], apex[2], a[0], a[1], a[2]);
+        verts.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    const mat = new THREE.LineBasicMaterial({
+      color: 0x6ee7ff, transparent: true, opacity: 0.42, depthWrite: false,
+    });
+    const lines = new THREE.LineSegments(geo, mat);
+    lines.name = 'camera-frustums';
+    lines.visible = multi.params.showCameras;
+    multiGroup.add(lines);
+    multi.cameraLines = lines;
+  }
+
+  // 用相机平均 up 方向把模型转正，获得更自然的初始视角
+  multiGroup.quaternion.identity();
+  let up = [0, 0, 0];
+  for (const cam of cams) {
+    up[0] -= cam.R[3];
+    up[1] -= cam.R[4];
+    up[2] -= cam.R[7];
+  }
+  const upLen = Math.hypot(up[0], up[1], up[2]);
+  if (upLen > 1e-6) {
+    const q = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(up[0] / upLen, up[1] / upLen, up[2] / upLen),
+      new THREE.Vector3(0, 1, 0)
+    );
+    multiGroup.quaternion.copy(q);
+  }
+  multiGroup.updateMatrixWorld(true);
+
+  updateHudFromObject(multi.sparsePoints);
+  $('empty').classList.add('hide');
+  $('hud').classList.add('show');
+  $('btnReset').disabled = false;
+  $('btnExport').disabled = false;
+  frameObject(multiGroup, true);
+}
+
+function showDenseMesh(dense) {
+  const m = dense.mesh;
+  const geo = new THREE.BufferGeometry();
+  const col = new Float32Array(m.colors.length);
+  for (let i = 0; i < m.colors.length; i += 3) {
+    bumpColor([m.colors[i] * 255, m.colors[i + 1] * 255, m.colors[i + 2] * 255], col, i);
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(m.normals, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setIndex(new THREE.BufferAttribute(m.indices, 1));
+  geo.computeBoundingSphere();
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.9, metalness: 0.02,
+    side: THREE.DoubleSide,
+  });
+  mat.wireframe = state.params.wireframe;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = 'dense-mesh';
+  mesh.visible = !state.params.points;
+  multiGroup.add(mesh);
+  multi.mesh = mesh;
+
+  // 稠密点云（可切换显示）
+  const meshRadius = geo.boundingSphere ? geo.boundingSphere.radius : 0.5;
+  const pmat = new THREE.PointsMaterial({
+    size: Math.max(0.001, meshRadius * 0.004), sizeAttenuation: true, vertexColors: true,
+    map: getPointSprite(), transparent: true, alphaTest: 0.2, depthWrite: true,
+  });
+  const points = new THREE.Points(geo, pmat);
+  points.name = 'dense-points';
+  points.visible = state.params.points;
+  multiGroup.add(points);
+  multi.meshPoints = points;
+
+  // 无光照材质备用
+  multi.meshUnlit = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+
+  // 稠密网格生成后自动隐藏稀疏点与相机视锥，避免遮挡表面；用户仍可手动打开
+  multi.params.showSparse = false;
+  multi.params.showCameras = false;
+  $('chkShowSparse').checked = false;
+  $('chkShowCameras').checked = false;
+  updateHudFromObject(mesh);
+  applyMultiDisplay();
+  $('empty').classList.add('hide');
+  $('hud').classList.add('show');
+  $('btnReset').disabled = false;
+  $('btnExport').disabled = false;
+  frameObject(mesh, true);
+}
+
+function applyMultiDisplay() {
+  if (!multi.mesh) return;
+  if (!multi.mesh.userData.stdMat) multi.mesh.userData.stdMat = multi.mesh.material;
+  const target = state.params.unlit ? multi.meshUnlit : multi.mesh.userData.stdMat;
+  if (target && multi.mesh.material !== target) multi.mesh.material = target;
+  if (target) target.wireframe = state.params.wireframe;
+
+  const usePoints = state.params.points;
+  multi.mesh.visible = !usePoints;
+  if (multi.meshPoints) multi.meshPoints.visible = usePoints;
+  if (multi.sparsePoints) multi.sparsePoints.visible = multi.params.showSparse;
+  if (multi.cameraLines) multi.cameraLines.visible = multi.params.showCameras;
+}
+
+function updateHudFromObject(obj) {
+  if (!obj) { $('hudVerts').textContent = '0'; $('hudTris').textContent = '0'; return; }
+  let verts = 0, tris = 0;
+  obj.traverse((o) => {
+    if (!o.geometry) return;
+    const g = o.geometry;
+    const pos = g.getAttribute('position');
+    if (pos) verts += pos.count;
+    if (g.index) tris += g.index.count / 3;
+    else if (pos && o.isMesh) tris += pos.count / 3;
+  });
+  $('hudVerts').textContent = fmt(Math.round(verts));
+  $('hudTris').textContent = fmt(Math.round(tris));
+}
+
+function updateMultiStats(sfm, dense) {
+  $('multiStats').classList.remove('hidden');
+  $('statCams').textContent = String(sfm.cameras.length);
+  $('statSparse').textContent = fmt(sfm.points.length);
+  if (dense) {
+    $('statVerts').textContent = fmt(dense.stats.vertices);
+    $('statTris').textContent = fmt(dense.stats.triangles);
+  }
+}
+
+/* ---------------- 多角度重建主流程 ---------------- */
+async function generateMulti() {
+  if (multi.files.length < 2 || state.busy || multi.running) return;
+  multi.running = true;
+  multi.cancel = false;
+  multi.result = null;
+  multi.dense = null;
+  clearMultiVisual();
+  // SfM 阶段默认展示相机与稀疏点；稠密网格生成后再自动隐藏
+  multi.params.showSparse = true;
+  multi.params.showCameras = true;
+  $('chkShowSparse').checked = true;
+  $('chkShowCameras').checked = true;
+  setBusy(true);
+  $('empty').classList.add('hide');
+
+  const sfmImages = multi.files.map((f) => ({
+    name: f.name, width: f.width, height: f.height, rgba: f.rgba, focal: f.focal,
+  }));
+
+  const hooks = {
+    onProgress: (e) => {
+      if (multi.cancel) return;
+      const p = (e.fraction == null) ? null : e.fraction * 0.6;
+      setStatus(e.message, p);
+    },
+    yieldFn: () => new Promise((r) => setTimeout(r, 0)),
+    shouldCancel: () => multi.cancel,
+  };
+
+  try {
+    setStatus('SfM：特征提取与匹配…', 0);
+    const sfm = await sfmReconstruct(sfmImages, {
+      nfeatures: 1200,
+      matchWindow: multi.params.matchWindow,
+      ring: true,
+      exhaustive: multi.files.length <= 16,
+      fovFallback: 55,
+      refIters: 2,
+    }, hooks);
+    if (multi.cancel) throw new Error('已取消');
+
+    multi.result = sfm;
+    showSparseAndCameras(sfm);
+    updateMultiStats(sfm);
+    setStatus(`SfM 完成 · ${sfm.stats.registeredCameras} 个相机 / ${sfm.stats.sparsePoints} 个稀疏点`, 0.6);
+    toast(`SfM 完成：${sfm.stats.registeredCameras} 个相机`, 'ok');
+
+    if (multi.params.dense && sfm.cameras.length >= 2) {
+      setStatus('MVS：多视图稠密重建…', 0.6);
+      const dense = await reconstructDense(sfm, {
+        quality: multi.params.quality,
+      }, {
+        onProgress: (e) => {
+          if (multi.cancel) return;
+          const p = (e.fraction == null) ? 0.6 : 0.6 + e.fraction * 0.4;
+          setStatus(e.message, p);
+        },
+        yieldFn: hooks.yieldFn,
+        shouldCancel: hooks.shouldCancel,
+      });
+      if (multi.cancel) throw new Error('已取消');
+      multi.dense = dense;
+      showDenseMesh(dense);
+      updateMultiStats(sfm, dense);
+      toast('稠密网格已生成', 'ok');
+    }
+
+    if (multi.cancel) throw new Error('已取消');
+    setStatus(
+      multi.dense
+        ? `完成 · ${fmt(multi.dense.stats.vertices)} 顶点 / ${fmt(multi.dense.stats.triangles)} 三角面`
+        : '完成 · 可查看相机与稀疏点云',
+      1
+    );
+  } catch (err) {
+    console.error(err);
+    if (multi.cancel || (err && err.message === '已取消')) {
+      setStatus('已取消', null);
+      toast('已取消重建');
+    } else {
+      setStatus('重建失败：' + (err.message || err), 1, 'error');
+      toast('重建失败：' + (err.message || err), 'error');
+    }
+    if (!multi.result) {
+      $('empty').classList.remove('hide');
+      $('hud').classList.remove('show');
+    }
+  } finally {
+    multi.running = false;
+    multi.cancel = false;
+    setBusy(false);
+  }
+}
+
 
 /* ============================================================
    生成主流程
@@ -827,6 +1592,7 @@ async function generate() {
     console.error(err);
     setStatus('生成失败：' + (err.message || err), 1, 'error');
     toast('生成失败：' + (err.message || err), 'error');
+    if (!state.modelRoot) $('empty').classList.remove('hide');
   } finally {
     setBusy(false);
   }
@@ -1353,17 +2119,31 @@ function frameObject(obj, animate = false) {
    导出 GLB
    ============================================================ */
 function exportGLB() {
+  if (state.mode === 'multi') {
+    const src = multi.dense ? multi.mesh : multi.sparsePoints;
+    if (!src) { toast('还没有可导出的模型', 'error'); return; }
+    // 复制几何并应用视角对齐旋转，保证导出的模型方向与页面一致
+    const root = src.clone();
+    root.geometry = src.geometry.clone();
+    root.geometry.applyQuaternion(multiGroup.quaternion);
+    exportObject(root, 'multiview');
+    return;
+  }
   if (!state.modelRoot) return;
+  exportObject(state.modelRoot, (state.fileName || 'model').replace(/\.[^.]+$/, ''));
+}
+
+function exportObject(root, baseName) {
   setStatus('导出中…', null);
   const exporter = new GLTFExporter();
   exporter.parse(
-    state.modelRoot,
+    root,
     (result) => {
       const blob = new Blob([result], { type: 'model/gltf-binary' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = (state.fileName || 'model').replace(/\.[^.]+$/, '') + '.glb';
+      a.download = baseName + '.glb';
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
       setStatus('已导出 GLB', 1);
@@ -1374,7 +2154,7 @@ function exportGLB() {
       setStatus('导出失败', 1, 'error');
       toast('导出失败：' + (err?.message || err), 'error');
     },
-    { binary: true }
+    { binary: true, onlyVisible: false }
   );
 }
 
